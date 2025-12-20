@@ -128,44 +128,60 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
           );
         },
         onLongPress: isDownloaded ? () => _showDeleteDialog(game) : null,
-        child: Stack(
-          children: [
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Icon(game.icon, size: 48, color: game.color),
-                const SizedBox(height: 8),
-                Text(
-                  game.name,
-                  style: const TextStyle(
-                      fontSize: 16, fontWeight: FontWeight.bold),
-                  textAlign: TextAlign.center,
-                ),
-                if (isDownloaded)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      _localization.translate('downloaded'),
-                      style: const TextStyle(fontSize: 10, color: Colors.grey),
-                      textAlign: TextAlign.center,
-                    ),
+        child: SizedBox(
+          height: 120,
+          child: Stack(
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(game.icon, size: 48, color: game.color),
+                      const SizedBox(height: 8),
+                      Text(
+                        game.name,
+                        style: const TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                        textAlign: TextAlign.center,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (isDownloaded)
+                        Padding(
+                          padding: const EdgeInsets.only(top: 4),
+                          child: Text(
+                            _localization.translate('downloaded'),
+                            style: const TextStyle(
+                                fontSize: 10, color: Colors.grey),
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                    ],
                   ),
-              ],
-            ),
-            if (isDownloaded)
-              Positioned(
-                top: 4,
-                right: 4,
-                child: IconButton(
-                  icon: const Icon(Icons.close, size: 18),
-                  color: Colors.red,
-                  padding: EdgeInsets.zero,
-                  constraints: const BoxConstraints(),
-                  onPressed: () => _showDeleteDialog(game),
                 ),
               ),
-          ],
+              if (isDownloaded)
+                Positioned(
+                  top: 4,
+                  right: 4,
+                  child: GestureDetector(
+                    onTap: () => _showDeleteDialog(game),
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(Icons.close,
+                          size: 14, color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
