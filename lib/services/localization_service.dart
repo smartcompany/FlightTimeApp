@@ -55,6 +55,9 @@ class LocalizationService extends ChangeNotifier {
       'downloaded': 'Downloaded',
       'no_games': 'No games available',
       'no_games_available': 'No games available',
+      'download_before_flight_title': 'Download Games Before Flight',
+      'download_before_flight_message':
+          'Download additional games now to play offline during your flight',
 
       // Game Store
       'available_games': 'Available Games',
@@ -113,6 +116,8 @@ class LocalizationService extends ChangeNotifier {
       'downloaded': '다운로드됨',
       'no_games': '게임이 없습니다',
       'no_games_available': '사용 가능한 게임이 없습니다',
+      'download_before_flight_title': '비행 전 게임 다운로드',
+      'download_before_flight_message': '지금 추가 게임을 다운로드하여 비행 중 오프라인으로 플레이하세요',
 
       // Game Store
       'available_games': '사용 가능한 게임',
@@ -171,6 +176,8 @@ class LocalizationService extends ChangeNotifier {
       'downloaded': 'ダウンロード済み',
       'no_games': 'ゲームがありません',
       'no_games_available': '利用可能なゲームがありません',
+      'download_before_flight_title': 'フライト前にゲームをダウンロード',
+      'download_before_flight_message': '今すぐ追加ゲームをダウンロードして、フライト中にオフラインでプレイできます',
 
       // Game Store
       'available_games': '利用可能なゲーム',
@@ -229,6 +236,8 @@ class LocalizationService extends ChangeNotifier {
       'downloaded': '已下载',
       'no_games': '没有游戏',
       'no_games_available': '没有可用游戏',
+      'download_before_flight_title': '飞行前下载游戏',
+      'download_before_flight_message': '立即下载更多游戏，以便在飞行期间离线游玩',
 
       // Game Store
       'available_games': '可用游戏',

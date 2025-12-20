@@ -19,11 +19,29 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
   final LocalizationService _localization = LocalizationService();
   List<GameInterface> _games = [];
   bool _showBuiltInOnly = false;
+  bool _showDownloadBanner = true;
+  bool _hasAvailableGames = false;
 
   @override
   void initState() {
     super.initState();
     _loadGames();
+    _checkAvailableGames();
+  }
+
+  Future<void> _checkAvailableGames() async {
+    try {
+      final available = await _downloader
+          .fetchAvailableGames('https://flight-time-server.vercel.app');
+      setState(() {
+        _hasAvailableGames = available.isNotEmpty;
+      });
+    } catch (e) {
+      // 서버 연결 실패 시 배너 숨기기
+      setState(() {
+        _hasAvailableGames = false;
+      });
+    }
   }
 
   void _loadGames() {
@@ -41,24 +59,139 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
         title: Text(_localization.translate('app_title')),
         centerTitle: true,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.store),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const GameStoreScreen(
-                    serverUrl: 'https://flight-time-server.vercel.app',
+          Stack(
+            children: [
+              IconButton(
+                icon: const Icon(Icons.store),
+                color: Colors.orange,
+                iconSize: 28,
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const GameStoreScreen(
+                        serverUrl: 'https://flight-time-server.vercel.app',
+                      ),
+                    ),
+                  ).then((_) {
+                    _loadGames();
+                    _checkAvailableGames();
+                  });
+                },
+                tooltip: _localization.translate('game_store'),
+              ),
+              if (_hasAvailableGames)
+                Positioned(
+                  right: 8,
+                  top: 8,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                    child: const SizedBox(
+                      width: 8,
+                      height: 8,
+                    ),
                   ),
                 ),
-              ).then((_) => _loadGames());
-            },
-            tooltip: _localization.translate('game_store'),
+            ],
           ),
         ],
       ),
       body: Column(
         children: [
+          // 다운로드 안내 배너
+          if (_showDownloadBanner && _hasAvailableGames)
+            GestureDetector(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => const GameStoreScreen(
+                      serverUrl: 'https://flight-time-server.vercel.app',
+                    ),
+                  ),
+                ).then((_) {
+                  _loadGames();
+                  _checkAvailableGames();
+                });
+              },
+              child: Container(
+                width: double.infinity,
+                margin: const EdgeInsets.all(8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.orange.shade400, Colors.orange.shade600],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.flight_takeoff,
+                      color: Colors.white,
+                      size: 28,
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _localization
+                                .translate('download_before_flight_title'),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            _localization
+                                .translate('download_before_flight_message'),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const Icon(
+                      Icons.arrow_forward_ios,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 4),
+                    GestureDetector(
+                      onTap: () {
+                        setState(() {
+                          _showDownloadBanner = false;
+                        });
+                      },
+                      child: const Icon(
+                        Icons.close,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           // 필터 버튼
           Padding(
             padding: const EdgeInsets.all(8),
