@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_lib/share_lib.dart' as share_lib;
 import '../services/game_registry.dart';
 import '../services/game_downloader.dart';
 import '../services/localization_service.dart';
@@ -25,8 +26,15 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
   @override
   void initState() {
     super.initState();
+    _initializeAds();
     _loadGames();
     _checkAvailableGames();
+  }
+
+  Future<void> _initializeAds() async {
+    share_lib.AdService.shared
+        .setBaseUrl('https://flight-time-server.vercel.app');
+    await share_lib.AdService.shared.loadSettings();
   }
 
   Future<void> _checkAvailableGames() async {
@@ -246,6 +254,46 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
     );
   }
 
+  Future<void> _launchGame(GameInterface game) async {
+    // 다운로드된 게임인 경우 광고 표시
+    final isDownloaded =
+        _registry.getDownloadedGames().any((g) => g.id == game.id);
+
+    if (isDownloaded) {
+      try {
+        await share_lib.AdService.shared.showInterstitialAd(
+          onAdDismissed: () {
+            // 광고 시청 완료 후 게임 실행
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => game.buildGame()),
+            );
+          },
+          onAdFailedToShow: () {
+            // 광고 표시 실패 시에도 게임 실행
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => game.buildGame()),
+            );
+          },
+        );
+      } catch (e) {
+        // 광고 표시 중 에러 발생 시 바로 게임 실행
+        debugPrint('Ad show error: $e');
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => game.buildGame()),
+        );
+      }
+    } else {
+      // 기본 게임은 바로 실행
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => game.buildGame()),
+      );
+    }
+  }
+
   Widget _buildGameCard(GameInterface game) {
     // 다운로드된 게임인지 확인
     final isDownloaded =
@@ -255,10 +303,7 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
       elevation: 4,
       child: InkWell(
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => game.buildGame()),
-          );
+          _launchGame(game);
         },
         onLongPress: isDownloaded ? () => _showDeleteDialog(game) : null,
         child: SizedBox(

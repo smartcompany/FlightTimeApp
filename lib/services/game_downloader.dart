@@ -48,6 +48,10 @@ class GameDownloader {
   }
 
   /// 게임 다운로드
+  /// 
+  /// Flutter는 동적 코드 로딩을 지원하지 않으므로,
+  /// 다운로드는 게임 메타데이터만 받습니다.
+  /// 실제 게임 코드는 클라이언트에 미리 구현되어 있어야 합니다.
   Future<bool> downloadGame(
       GameMetadata metadata, Function(int, int)? onProgress) async {
     try {
@@ -60,86 +64,98 @@ class GameDownloader {
         await gamesDir.create(recursive: true);
       }
 
-      final gameFile = File('${gamesDir.path}/${metadata.id}.dart');
-
-      // 서버에서 게임 파일 다운로드
-      // downloadUrl이 상대 경로인 경우 서버 URL과 결합
-      final downloadUrl = metadata.downloadUrl.startsWith('http')
-          ? metadata.downloadUrl
-          : '${_currentServerUrl ?? 'http://localhost:3000'}${metadata.downloadUrl}';
-
+      // 서버에서 받은 전체 게임 데이터를 JSON으로 저장 (게임 로더에서 사용)
+      // 서버 API에서 전체 게임 정보 가져오기
       final client = HttpClient();
-      final uri = Uri.parse(downloadUrl);
-      print('Parsed URI: $uri');
+      try {
+        final metadataPath = metadata.downloadUrl.replaceAll('/download', '');
+        final metadataUrl = metadataPath.startsWith('http')
+            ? metadataPath
+            : '${_currentServerUrl ?? 'http://localhost:3000'}$metadataPath';
+        final metadataUri = Uri.parse(metadataUrl);
+        print('Fetching metadata from: $metadataUri');
 
-      final request = await client.getUrl(uri);
-      final response = await request.close();
+        final metadataRequest = await client.getUrl(metadataUri);
+        final metadataResponse = await metadataRequest.close();
 
-      print('Response status code: ${response.statusCode}');
+        if (metadataResponse.statusCode == 200) {
+          final metadataJsonString =
+              await metadataResponse.transform(utf8.decoder).join();
+          final fullGameData =
+              json.decode(metadataJsonString) as Map<String, dynamic>;
 
-      if (response.statusCode == 200) {
-        final contentLength = response.contentLength;
-        print('Content length: $contentLength');
+          // 게임 타입 확인
+          final gameType = fullGameData['gameType'] as String?;
+          
+          // WebView 게임인 경우 HTML 파일 다운로드
+          if (gameType == 'webview') {
+            final htmlUrl = fullGameData['htmlUrl'] as String?;
+            if (htmlUrl == null) {
+              print('htmlUrl not found for webview game');
+              return false;
+            }
+            
+            // HTML 파일 다운로드
+            final htmlDownloadUrl = htmlUrl.startsWith('http')
+                ? htmlUrl
+                : '${_currentServerUrl ?? 'http://localhost:3000'}$htmlUrl';
+            final htmlUri = Uri.parse(htmlDownloadUrl);
+            print('Downloading HTML file from: $htmlUri');
 
-        final bytes = <int>[];
-        int downloaded = 0;
+            final htmlRequest = await client.getUrl(htmlUri);
+            final htmlResponse = await htmlRequest.close();
 
-        await for (var chunk in response) {
-          bytes.addAll(chunk);
-          downloaded += chunk.length;
-          if (onProgress != null && contentLength > 0) {
-            onProgress(downloaded, contentLength);
+            if (htmlResponse.statusCode == 200) {
+              final contentLength = htmlResponse.contentLength;
+              final bytes = <int>[];
+              int downloaded = 0;
+
+              await for (var chunk in htmlResponse) {
+                bytes.addAll(chunk);
+                downloaded += chunk.length;
+                if (onProgress != null && contentLength > 0) {
+                  // 진행률 계산 (메타데이터 20%, HTML 80%)
+                  final progress = ((downloaded / contentLength) * 80 + 20).round();
+                  onProgress(progress, 100);
+                }
+              }
+
+              final htmlContent = utf8.decode(bytes);
+              final htmlFile = File('${directory.path}/games/${metadata.id}.html');
+              await htmlFile.writeAsString(htmlContent);
+              print('HTML file saved to: ${htmlFile.path} (${bytes.length} bytes)');
+            } else {
+              print('Failed to download HTML file: ${htmlResponse.statusCode}');
+              return false;
+            }
           }
-        }
 
-        print('Downloaded ${bytes.length} bytes');
-
-        // 게임 파일 저장
-        await gameFile.writeAsBytes(bytes);
-        print('Game file saved to: ${gameFile.path}');
-
-        // 서버에서 받은 전체 게임 데이터를 JSON으로 저장 (게임 로더에서 사용)
-        // 서버 API에서 전체 게임 정보 가져오기
-        try {
-          final metadataPath = metadata.downloadUrl.replaceAll('/download', '');
-          final metadataUrl = metadataPath.startsWith('http')
-              ? metadataPath
-              : '${_currentServerUrl ?? 'http://localhost:3000'}$metadataPath';
-          final metadataUri = Uri.parse(metadataUrl);
-          print('Fetching metadata from: $metadataUri');
-
-          final metadataRequest = await client.getUrl(metadataUri);
-          final metadataResponse = await metadataRequest.close();
-
-          if (metadataResponse.statusCode == 200) {
-            final metadataJsonString =
-                await metadataResponse.transform(utf8.decoder).join();
-            final fullGameData =
-                json.decode(metadataJsonString) as Map<String, dynamic>;
-
-            // 전체 게임 데이터를 JSON 파일로 저장
-            final metadataFile =
-                File('${directory.path}/games/${metadata.id}.json');
-            await metadataFile.writeAsString(json.encode(fullGameData));
-            print('Metadata file saved to: ${metadataFile.path}');
-          } else {
-            print(
-                'Failed to fetch game metadata: ${metadataResponse.statusCode}');
-            // 메타데이터 가져오기 실패해도 다운로드는 성공으로 처리
+          // 전체 게임 데이터를 JSON 파일로 저장
+          final metadataFile =
+              File('${directory.path}/games/${metadata.id}.json');
+          await metadataFile.writeAsString(json.encode(fullGameData));
+          print('Metadata file saved to: ${metadataFile.path}');
+          
+          // 다운로드 완료
+          if (onProgress != null) {
+            onProgress(100, 100);
           }
-        } catch (e) {
-          print('Error fetching game metadata: $e');
-          // 메타데이터 가져오기 실패해도 다운로드는 성공으로 처리
+
+          // 메타데이터 저장
+          await _saveDownloadedGameMetadata(metadata);
+          print('Download completed successfully');
+
+          return true;
+        } else {
+          print(
+              'Failed to fetch game metadata: ${metadataResponse.statusCode}');
+          return false;
         }
-
-        // 메타데이터 저장
-        await _saveDownloadedGameMetadata(metadata);
-        print('Download completed successfully');
-
-        return true;
-      } else {
-        print('Download failed with status code: ${response.statusCode}');
+      } catch (e) {
+        print('Error fetching game metadata: $e');
         return false;
+      } finally {
+        client.close();
       }
     } catch (e, stackTrace) {
       print('Error downloading game: $e');
