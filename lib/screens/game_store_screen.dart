@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:share_lib/share_lib.dart' as share_lib;
 import '../models/game_metadata.dart';
 import '../services/game_downloader.dart';
 import '../services/localization_service.dart';
@@ -29,7 +30,13 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
   @override
   void initState() {
     super.initState();
+    _initializeAds();
     _loadGames();
+  }
+
+  Future<void> _initializeAds() async {
+    share_lib.AdService.shared.setBaseUrl(widget.serverUrl);
+    await share_lib.AdService.shared.loadSettings();
   }
 
   Future<void> _loadGames() async {
@@ -62,6 +69,29 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
   }
 
   Future<void> _downloadGame(GameMetadata game) async {
+    // 광고 표시 (보상형 광고)
+    // 광고가 로드되지 않았거나 실패하면 바로 다운로드 진행
+    try {
+      await share_lib.AdService.shared.showInterstitialAd(
+        onAdDismissed: () {
+          // 광고 시청 완료 후 다운로드 진행
+          _performDownload(game);
+        },
+        onAdFailedToShow: () {
+          // 광고 표시 실패 시에도 다운로드 진행
+          _performDownload(game);
+        },
+      );
+    } catch (e) {
+      // 광고 표시 중 에러 발생 시 바로 다운로드 진행
+      debugPrint('Ad show error: $e');
+      _performDownload(game);
+    }
+  }
+
+  Future<void> _performDownload(GameMetadata game) async {
+    if (!mounted) return;
+
     setState(() {
       _downloadingGames[game.id] = true;
       _downloadProgress[game.id] = 0;
@@ -70,31 +100,31 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
     final success = await _downloader.downloadGame(
       game,
       (downloaded, total) {
-        setState(() {
-          _downloadProgress[game.id] = ((downloaded / total) * 100).toInt();
-        });
+        if (mounted) {
+          setState(() {
+            _downloadProgress[game.id] = ((downloaded / total) * 100).toInt();
+          });
+        }
       },
     );
 
-    setState(() {
-      _downloadingGames[game.id] = false;
-      _downloadProgress.remove(game.id);
-    });
+    if (mounted) {
+      setState(() {
+        _downloadingGames[game.id] = false;
+        _downloadProgress.remove(game.id);
+      });
 
-    if (success) {
-      // 게임 로드
-      await _downloader.loadDownloadedGame(game.id);
-      await _loadGames();
+      if (success) {
+        // 게임 로드
+        await _downloader.loadDownloadedGame(game.id);
+        await _loadGames();
 
-      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(_localization.translateWithParams(
                   'download_complete', {'name': game.name}))),
         );
-      }
-    } else {
-      if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
               content: Text(_localization.translateWithParams(

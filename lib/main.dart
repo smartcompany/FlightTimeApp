@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'dart:ui';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'screens/home_screen_v2.dart';
 import 'config/game_initializer.dart';
 import 'services/game_downloader.dart';
@@ -7,6 +8,14 @@ import 'services/localization_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Google Mobile Ads 초기화 (가장 먼저 실행)
+  try {
+    await MobileAds.instance.initialize();
+  } catch (e) {
+    debugPrint('MobileAds initialization error: $e');
+    // 광고 초기화 실패해도 앱은 계속 실행
+  }
 
   // 로컬라이징 초기화
   final localization = LocalizationService();
