@@ -53,6 +53,8 @@ class GameUnlocker {
       'puzzle',
       'tetris',
       'game2048',
+      'solitaire',
+      'tower_defense',
     ];
     await prefs.setStringList(_unlockedGamesKey, allGameIds);
   }

@@ -11,6 +11,8 @@ import '../screens/game_screens/runner_game.dart';
 import '../screens/game_screens/puzzle_game.dart';
 import '../screens/game_screens/tetris_game.dart';
 import '../screens/game_screens/game2048.dart';
+import '../screens/game_screens/solitaire_game.dart';
+import '../screens/game_screens/tower_defense_game.dart';
 import 'game_registry.dart';
 import 'game_unlocker.dart';
 
@@ -84,6 +86,10 @@ class GameLoader {
         return () => const TetrisGame();
       case 'game2048':
         return () => const Game2048();
+      case 'solitaire':
+        return () => const SolitaireGame();
+      case 'tower_defense':
+        return () => const TowerDefenseGame();
       default:
         return null;
     }
@@ -112,6 +118,10 @@ class GameLoader {
         return Icons.view_module;
       case 'game2048':
         return Icons.grid_on;
+      case 'solitaire':
+        return Icons.deck;
+      case 'tower_defense':
+        return Icons.castle;
       default:
         return Icons.gamepad;
     }
@@ -140,6 +150,10 @@ class GameLoader {
         return Colors.cyan;
       case 'game2048':
         return Colors.orange;
+      case 'solitaire':
+        return Colors.green;
+      case 'tower_defense':
+        return Colors.deepPurple;
       default:
         return Colors.blue;
     }
