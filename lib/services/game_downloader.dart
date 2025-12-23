@@ -84,52 +84,6 @@ class GameDownloader {
           final fullGameData =
               json.decode(metadataJsonString) as Map<String, dynamic>;
 
-          // 게임 타입 확인
-          final gameType = fullGameData['gameType'] as String?;
-          
-          // WebView 게임인 경우 HTML 파일 다운로드
-          if (gameType == 'webview') {
-            final htmlUrl = fullGameData['htmlUrl'] as String?;
-            if (htmlUrl == null) {
-              print('htmlUrl not found for webview game');
-              return false;
-            }
-            
-            // HTML 파일 다운로드
-            final htmlDownloadUrl = htmlUrl.startsWith('http')
-                ? htmlUrl
-                : '${_currentServerUrl ?? 'http://localhost:3000'}$htmlUrl';
-            final htmlUri = Uri.parse(htmlDownloadUrl);
-            print('Downloading HTML file from: $htmlUri');
-
-            final htmlRequest = await client.getUrl(htmlUri);
-            final htmlResponse = await htmlRequest.close();
-
-            if (htmlResponse.statusCode == 200) {
-              final contentLength = htmlResponse.contentLength;
-              final bytes = <int>[];
-              int downloaded = 0;
-
-              await for (var chunk in htmlResponse) {
-                bytes.addAll(chunk);
-                downloaded += chunk.length;
-                if (onProgress != null && contentLength > 0) {
-                  // 진행률 계산 (메타데이터 20%, HTML 80%)
-                  final progress = ((downloaded / contentLength) * 80 + 20).round();
-                  onProgress(progress, 100);
-                }
-              }
-
-              final htmlContent = utf8.decode(bytes);
-              final htmlFile = File('${directory.path}/games/${metadata.id}.html');
-              await htmlFile.writeAsString(htmlContent);
-              print('HTML file saved to: ${htmlFile.path} (${bytes.length} bytes)');
-            } else {
-              print('Failed to download HTML file: ${htmlResponse.statusCode}');
-              return false;
-            }
-          }
-
           // 전체 게임 데이터를 JSON 파일로 저장
           final metadataFile =
               File('${directory.path}/games/${metadata.id}.json');
@@ -164,12 +118,14 @@ class GameDownloader {
     }
   }
 
-  /// 다운로드된 게임 로드
+  /// 다운로드된 게임 로드 (더 이상 사용되지 않음 - GameUnlocker 사용)
+  @Deprecated('Use GameLoader.loadUnlockedGame instead')
   Future<bool> loadDownloadedGame(String gameId) async {
     try {
       // GameLoader를 사용하여 게임 로드
       final gameLoader = GameLoader();
-      return await gameLoader.loadGameFromFile(gameId);
+      // 이 메서드는 더 이상 사용되지 않음
+      return false;
     } catch (e) {
       print('Error loading game: $e');
       return false;
@@ -186,16 +142,11 @@ class GameDownloader {
     return jsonList.map((json) => GameMetadata.fromJson(json)).toList();
   }
 
-  /// 게임 삭제
+  /// 게임 삭제 (더 이상 사용되지 않음 - 잠금 해제 시스템에서는 삭제 불가)
+  @Deprecated('Games cannot be deleted in unlock system')
   Future<bool> deleteGame(String gameId) async {
     try {
       final directory = await getApplicationDocumentsDirectory();
-
-      // Dart 파일 삭제
-      final gameFile = File('${directory.path}/games/$gameId.dart');
-      if (await gameFile.exists()) {
-        await gameFile.delete();
-      }
 
       // JSON 메타데이터 파일 삭제
       final metadataFile = File('${directory.path}/games/$gameId.json');

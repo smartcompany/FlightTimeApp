@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:share_lib/share_lib.dart' as share_lib;
 import '../services/game_registry.dart';
 import '../services/game_downloader.dart';
+import '../services/game_unlocker.dart';
+import '../services/game_loader.dart';
 import '../services/localization_service.dart';
 import '../interfaces/game_interface.dart';
 import 'game_store_screen.dart';
@@ -17,6 +19,8 @@ class HomeScreenV2 extends StatefulWidget {
 class _HomeScreenV2State extends State<HomeScreenV2> {
   final GameRegistry _registry = GameRegistry();
   final GameDownloader _downloader = GameDownloader();
+  final GameUnlocker _unlocker = GameUnlocker();
+  final GameLoader _loader = GameLoader();
   final LocalizationService _localization = LocalizationService();
   List<GameInterface> _games = [];
   bool _showDownloadBanner = true;
@@ -26,8 +30,31 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
   void initState() {
     super.initState();
     _initializeAds();
+    _loadUnlockedGames();
     _loadGames();
     _checkAvailableGames();
+  }
+
+  Future<void> _loadUnlockedGames() async {
+    try {
+      final availableGames = await _downloader.fetchAvailableGames('https://flight-time-server.vercel.app');
+      final unlockedGameIds = await _unlocker.getUnlockedGames();
+      
+      for (var gameId in unlockedGameIds) {
+        try {
+          final game = availableGames.firstWhere((g) => g.id == gameId);
+          await _loader.loadUnlockedGame(gameId, game);
+        } catch (e) {
+          debugPrint('Error loading unlocked game $gameId: $e');
+        }
+      }
+      
+      if (mounted) {
+        _loadGames();
+      }
+    } catch (e) {
+      debugPrint('Error loading unlocked games: $e');
+    }
   }
 
   Future<void> _initializeAds() async {
@@ -79,7 +106,7 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
                       ),
                     ),
                   ).then((_) {
-                    _loadGames();
+                    _loadUnlockedGames();
                     _checkAvailableGames();
                   });
                 },
@@ -120,7 +147,7 @@ class _HomeScreenV2State extends State<HomeScreenV2> {
                       ),
                     ),
                   ).then((_) {
-                    _loadGames();
+                    _loadUnlockedGames();
                     _checkAvailableGames();
                   });
                 },

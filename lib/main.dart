@@ -5,6 +5,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'screens/home_screen_v2.dart';
 import 'config/game_initializer.dart';
 import 'services/game_downloader.dart';
+import 'services/game_unlocker.dart';
+import 'services/game_loader.dart';
 import 'services/localization_service.dart';
 
 void main() async {
@@ -29,11 +31,35 @@ void main() async {
   // 기본 게임 초기화
   GameInitializer.initializeBuiltInGames();
 
-  // 다운로드된 게임 로드
+  // 잠금 해제된 게임 로드
+  final unlocker = GameUnlocker();
+  final loader = GameLoader();
   final downloader = GameDownloader();
-  final downloadedGames = await downloader.getDownloadedGames();
-  for (var game in downloadedGames) {
-    await downloader.loadDownloadedGame(game.id);
+
+  // 서버에서 게임 목록 가져오기
+  try {
+    final availableGames = await downloader
+        .fetchAvailableGames('https://flight-time-server.vercel.app');
+    final unlockedGameIds = await unlocker.getUnlockedGames();
+
+    debugPrint('Unlocked games: $unlockedGameIds');
+    debugPrint('Available games: ${availableGames.map((g) => g.id).toList()}');
+
+    // 잠금 해제된 게임들을 로드
+    for (var gameId in unlockedGameIds) {
+      try {
+        final game = availableGames.firstWhere(
+          (g) => g.id == gameId,
+        );
+        final success = await loader.loadUnlockedGame(gameId, game);
+        debugPrint('Loaded game $gameId: $success');
+      } catch (e) {
+        debugPrint('Error loading game $gameId: $e');
+      }
+    }
+  } catch (e) {
+    debugPrint('Error loading unlocked games: $e');
+    // 서버 연결 실패해도 앱은 계속 실행
   }
 
   runApp(const FlightTimeGamesApp());

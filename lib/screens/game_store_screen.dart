@@ -3,9 +3,11 @@ import 'package:flutter/foundation.dart';
 import 'package:share_lib/share_lib.dart' as share_lib;
 import '../models/game_metadata.dart';
 import '../services/game_downloader.dart';
+import '../services/game_unlocker.dart';
+import '../services/game_loader.dart';
 import '../services/localization_service.dart';
 
-/// 게임 스토어 화면 - 서버에서 게임 다운로드
+/// 게임 스토어 화면 - 광고를 보고 게임 잠금 해제
 class GameStoreScreen extends StatefulWidget {
   final String serverUrl;
 
@@ -20,13 +22,14 @@ class GameStoreScreen extends StatefulWidget {
 
 class _GameStoreScreenState extends State<GameStoreScreen> {
   final GameDownloader _downloader = GameDownloader();
+  final GameUnlocker _unlocker = GameUnlocker();
+  final GameLoader _loader = GameLoader();
   final LocalizationService _localization = LocalizationService();
   List<GameMetadata> _availableGames = [];
-  List<GameMetadata> _downloadedGames = [];
+  List<String> _unlockedGames = [];
   bool _isLoading = true;
   String? _errorMessage;
-  Map<String, bool> _downloadingGames = {};
-  Map<String, int> _downloadProgress = {};
+  Map<String, bool> _unlockingGames = {};
 
   @override
   void initState() {
@@ -50,12 +53,12 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
       // 서버에서 게임 목록 가져오기
       final available = await _downloader.fetchAvailableGames(widget.serverUrl);
 
-      // 다운로드된 게임 목록 가져오기
-      final downloaded = await _downloader.getDownloadedGames();
+      // 잠금 해제된 게임 목록 가져오기
+      final unlocked = await _unlocker.getUnlockedGames();
 
       setState(() {
         _availableGames = available;
-        _downloadedGames = downloaded;
+        _unlockedGames = unlocked;
         _isLoading = false;
         if (available.isEmpty) {
           _errorMessage = '서버에서 게임을 불러올 수 없습니다. 서버 상태를 확인해주세요.';
@@ -69,9 +72,9 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
     }
   }
 
-  Future<void> _downloadGame(GameMetadata game) async {
+  Future<void> _unlockGame(GameMetadata game) async {
     // 광고 타입에 따라 자동으로 적절한 광고 표시
-    // 광고가 로드되지 않았거나 실패하면 바로 다운로드 진행
+    // 광고가 로드되지 않았거나 실패하면 바로 잠금 해제 진행
 
     // 로딩 다이얼로그 표시
     showDialog(
@@ -85,90 +88,71 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
     try {
       await share_lib.AdService.shared.showAd(
         onAdDismissed: () {
-          // 광고 시청 완료 후 다운로드 진행
+          // 광고 시청 완료 후 잠금 해제 진행
           if (mounted) {
             Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-            _performDownload(game);
+            _performUnlock(game);
           }
         },
         onAdFailedToShow: () {
-          // 광고 표시 실패 시에도 다운로드 진행
+          // 광고 표시 실패 시에도 잠금 해제 진행
           if (mounted) {
             Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-            _performDownload(game);
+            _performUnlock(game);
           }
         },
       );
     } catch (e) {
-      // 광고 표시 중 에러 발생 시 바로 다운로드 진행
+      // 광고 표시 중 에러 발생 시 바로 잠금 해제 진행
       debugPrint('Ad show error: $e');
       if (mounted) {
         Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-        _performDownload(game);
+        _performUnlock(game);
       }
     }
   }
 
-  Future<void> _performDownload(GameMetadata game) async {
+  Future<void> _performUnlock(GameMetadata game) async {
     if (!mounted) return;
 
     setState(() {
-      _downloadingGames[game.id] = true;
-      _downloadProgress[game.id] = 0;
+      _unlockingGames[game.id] = true;
     });
 
-    final success = await _downloader.downloadGame(
-      game,
-      (downloaded, total) {
-        if (mounted) {
-          setState(() {
-            _downloadProgress[game.id] = ((downloaded / total) * 100).toInt();
-          });
-        }
-      },
-    );
+    // 게임 잠금 해제
+    final success = await _unlocker.unlockGame(game.id);
 
     if (mounted) {
       setState(() {
-        _downloadingGames[game.id] = false;
-        _downloadProgress.remove(game.id);
+        _unlockingGames[game.id] = false;
       });
 
       if (success) {
         // 게임 로드
-        await _downloader.loadDownloadedGame(game.id);
+        await _loader.loadUnlockedGame(game.id, game);
         await _loadGames();
-        // 다운로드 완료는 조용히 처리 (스낵바 표시 안 함)
+        // 잠금 해제 완료는 조용히 처리 (스낵바 표시 안 함)
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-              content: Text(_localization.translateWithParams(
-                  'download_failed', {'name': game.name}))),
+              content: Text('게임 잠금 해제에 실패했습니다: ${game.name}')),
         );
       }
     }
   }
 
-  Future<void> _downloadAllGames() async {
+  Future<void> _unlockAllGames() async {
     if (!mounted) return;
 
-    // 디버그 모드에서는 이미 다운로드된 게임도 포함하여 모두 다운로드
-    final gamesToDownload = _availableGames.toList();
-
-    if (gamesToDownload.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('다운로드할 게임이 없습니다.')),
-      );
-      return;
-    }
+    // 디버그 모드에서만 사용 가능
+    if (!kDebugMode) return;
 
     // 확인 다이얼로그
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('모든 게임 다운로드'),
-        content: Text(
-            '${gamesToDownload.length}개의 게임을 다운로드하시겠습니까?\n(이미 다운로드된 게임도 다시 다운로드됩니다)'),
+        title: const Text('모든 게임 잠금 해제 (디버그)'),
+        content: const Text('모든 게임을 잠금 해제하시겠습니까?'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -176,7 +160,7 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('다운로드'),
+            child: const Text('잠금 해제'),
           ),
         ],
       ),
@@ -184,91 +168,21 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
 
     if (confirmed != true) return;
 
-    // 로딩 다이얼로그 표시
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(
-        child: CircularProgressIndicator(),
-      ),
-    );
-
-    int successCount = 0;
-    int failCount = 0;
-
-    for (var game in gamesToDownload) {
-      if (!mounted) break;
-
-      final success = await _downloader.downloadGame(
-        game,
-        (downloaded, total) {
-          // 진행률은 표시하지 않음 (여러 게임 동시 다운로드)
-        },
-      );
-
-      if (success) {
-        await _downloader.loadDownloadedGame(game.id);
-        successCount++;
-      } else {
-        failCount++;
-      }
-    }
+    await _unlocker.unlockAllGames();
+    await _loadGames();
 
     if (mounted) {
-      Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
-      await _loadGames();
-
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('다운로드 완료: $successCount개 성공, $failCount개 실패'),
-          duration: const Duration(seconds: 3),
+        const SnackBar(
+          content: Text('모든 게임이 잠금 해제되었습니다.'),
+          duration: Duration(seconds: 2),
         ),
       );
     }
   }
 
-  Future<void> _deleteGame(GameMetadata game) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text(_localization.translate('delete_game')),
-        content: Text(_localization
-            .translateWithParams('delete_confirmation', {'name': game.name})),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: Text(_localization.translate('cancel')),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: Text(_localization.translate('delete')),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      await _downloader.deleteGame(game.id);
-      await _loadGames();
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(_localization.translateWithParams(
-                  'delete_complete', {'name': game.name}))),
-        );
-      }
-    }
-  }
-
-  bool _isDownloaded(String gameId) {
-    return _downloadedGames.any((game) => game.id == gameId);
-  }
-
-  String _formatFileSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  bool _isUnlocked(String gameId) {
+    return _unlockedGames.contains(gameId);
   }
 
   @override
@@ -279,9 +193,9 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
         actions: [
           if (kDebugMode)
             IconButton(
-              icon: const Icon(Icons.download_for_offline),
-              tooltip: '모든 게임 다운로드 (디버그)',
-              onPressed: _downloadAllGames,
+              icon: const Icon(Icons.lock_open),
+              tooltip: '모든 게임 잠금 해제 (디버그)',
+              onPressed: _unlockAllGames,
             ),
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -315,7 +229,7 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
                     ),
                   ),
                 )
-              : _availableGames.isEmpty && _downloadedGames.isEmpty
+                  : _availableGames.isEmpty
                   ? Center(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
@@ -333,15 +247,15 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
                     )
                   : Column(
                       children: [
-                        // 다운로드된 게임 섹션
-                        if (_downloadedGames.isNotEmpty) ...[
+                        // 잠금 해제된 게임 섹션
+                        if (_unlockedGames.isNotEmpty) ...[
                           Padding(
                             padding: const EdgeInsets.all(16),
                             child: Align(
                               alignment: Alignment.centerLeft,
-                              child: Text(
-                                _localization.translate('downloaded_games'),
-                                style: const TextStyle(
+                              child: const Text(
+                                '잠금 해제된 게임',
+                                style: TextStyle(
                                     fontSize: 18, fontWeight: FontWeight.bold),
                               ),
                             ),
@@ -349,16 +263,22 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
                           Expanded(
                             flex: 1,
                             child: ListView.builder(
-                              itemCount: _downloadedGames.length,
+                              itemCount: _availableGames
+                                  .where((g) => _isUnlocked(g.id))
+                                  .length,
                               itemBuilder: (context, index) {
-                                final game = _downloadedGames[index];
-                                return ListTile(
-                                  leading: const Icon(Icons.gamepad),
-                                  title: Text(game.name),
-                                  subtitle: Text(game.description),
-                                  trailing: IconButton(
-                                    icon: const Icon(Icons.delete),
-                                    onPressed: () => _deleteGame(game),
+                                final game = _availableGames
+                                    .where((g) => _isUnlocked(g.id))
+                                    .elementAt(index);
+                                return Card(
+                                  margin: const EdgeInsets.symmetric(
+                                      horizontal: 16, vertical: 8),
+                                  child: ListTile(
+                                    leading: const Icon(Icons.gamepad, size: 40),
+                                    title: Text(game.name),
+                                    subtitle: Text(game.description),
+                                    trailing: const Icon(Icons.check_circle,
+                                        color: Colors.green),
                                   ),
                                 );
                               },
@@ -366,14 +286,14 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
                           ),
                           const Divider(),
                         ],
-                        // 사용 가능한 게임 섹션
+                        // 잠금된 게임 섹션
                         Padding(
                           padding: const EdgeInsets.all(16),
                           child: Align(
                             alignment: Alignment.centerLeft,
-                            child: Text(
-                              _localization.translate('available_games'),
-                              style: const TextStyle(
+                            child: const Text(
+                              '잠금된 게임',
+                              style: TextStyle(
                                   fontSize: 18, fontWeight: FontWeight.bold),
                             ),
                           ),
@@ -381,59 +301,46 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
                         Expanded(
                           flex: 2,
                           child: ListView.builder(
-                            itemCount: _availableGames.length,
+                            itemCount: _availableGames
+                                .where((g) => !_isUnlocked(g.id))
+                                .length,
                             itemBuilder: (context, index) {
-                              final game = _availableGames[index];
-                              final isDownloaded = _isDownloaded(game.id);
-                              final isDownloading =
-                                  _downloadingGames[game.id] ?? false;
-                              final progress = _downloadProgress[game.id] ?? 0;
+                              final game = _availableGames
+                                  .where((g) => !_isUnlocked(g.id))
+                                  .elementAt(index);
+                              final isUnlocking =
+                                  _unlockingGames[game.id] ?? false;
 
                               return Card(
                                 margin: const EdgeInsets.symmetric(
                                     horizontal: 16, vertical: 8),
                                 child: ListTile(
-                                  leading: const Icon(Icons.gamepad, size: 40),
-                                  title: Text(game.name),
-                                  subtitle: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                  leading: Stack(
                                     children: [
-                                      Text(game.description),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        '${_localization.translate('file_size')}: ${_formatFileSize(game.fileSize)}',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: Colors.grey[600]),
+                                      const Icon(Icons.gamepad, size: 40),
+                                      Positioned(
+                                        right: 0,
+                                        top: 0,
+                                        child: Icon(Icons.lock,
+                                            size: 16, color: Colors.grey[600]),
                                       ),
-                                      if (isDownloading) ...[
-                                        const SizedBox(height: 8),
-                                        LinearProgressIndicator(
-                                            value: progress / 100),
-                                        Text('$progress%',
-                                            style:
-                                                const TextStyle(fontSize: 12)),
-                                      ],
                                     ],
                                   ),
-                                  trailing: isDownloaded
-                                      ? const Icon(Icons.check_circle,
-                                          color: Colors.green)
-                                      : IconButton(
-                                          icon: isDownloading
-                                              ? const SizedBox(
-                                                  width: 20,
-                                                  height: 20,
-                                                  child:
-                                                      CircularProgressIndicator(
-                                                          strokeWidth: 2),
-                                                )
-                                              : const Icon(Icons.download),
-                                          onPressed: isDownloading
-                                              ? null
-                                              : () => _downloadGame(game),
-                                        ),
+                                  title: Text(game.name),
+                                  subtitle: Text(game.description),
+                                  trailing: IconButton(
+                                    icon: isUnlocking
+                                        ? const SizedBox(
+                                            width: 20,
+                                            height: 20,
+                                            child: CircularProgressIndicator(
+                                                strokeWidth: 2),
+                                          )
+                                        : const Icon(Icons.lock_open),
+                                    onPressed: isUnlocking
+                                        ? null
+                                        : () => _unlockGame(game),
+                                  ),
                                 ),
                               );
                             },
