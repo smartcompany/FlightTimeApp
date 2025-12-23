@@ -91,72 +91,74 @@ class _ReactionTestState extends State<ReactionTest> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: const Text('반응속도 테스트')),
-      body: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              children: [
-                if (reactionTimes.isNotEmpty) ...[
-                  Text(
-                    '평균: ${getAverageReactionTime().toStringAsFixed(0)}ms',
-                    style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-                  ),
-                  Text(
-                    '최고 기록: ${reactionTimes.reduce((a, b) => a < b ? a : b)}ms',
-                    style: const TextStyle(fontSize: 18),
-                  ),
-                  Text(
-                    '시도 횟수: ${reactionTimes.length}',
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: canClick ? recordReaction : startTest,
-              child: Container(
-                width: double.infinity,
-                color: backgroundColor,
-                child: Center(
-                  child: Text(
-                    displayText,
-                    style: const TextStyle(
-                      fontSize: 32,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
+      body: SafeArea(
+        child: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  if (reactionTimes.isNotEmpty) ...[
+                    Text(
+                      '평균: ${getAverageReactionTime().toStringAsFixed(0)}ms',
+                      style: const TextStyle(
+                          fontSize: 20, fontWeight: FontWeight.bold),
                     ),
-                    textAlign: TextAlign.center,
+                    Text(
+                      '최고 기록: ${reactionTimes.reduce((a, b) => a < b ? a : b)}ms',
+                      style: const TextStyle(fontSize: 18),
+                    ),
+                    Text(
+                      '시도 횟수: ${reactionTimes.length}',
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Expanded(
+              child: GestureDetector(
+                onTap: canClick ? recordReaction : startTest,
+                child: Container(
+                  width: double.infinity,
+                  color: backgroundColor,
+                  child: Center(
+                    child: Text(
+                      displayText,
+                      style: const TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
                   ),
                 ),
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                ElevatedButton(
-                  onPressed: reset,
-                  child: const Text('초기화'),
-                ),
-                ElevatedButton(
-                  onPressed: () {
-                    setState(() {
-                      reactionTimes.clear();
-                    });
-                  },
-                  child: const Text('기록 지우기'),
-                ),
-              ],
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    onPressed: reset,
+                    child: const Text('초기화'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      setState(() {
+                        reactionTimes.clear();
+                      });
+                    },
+                    child: const Text('기록 지우기'),
+                  ),
+                ],
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
 }
-

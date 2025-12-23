@@ -6,11 +6,7 @@ import '../screens/game_screens/tic_tac_toe.dart';
 import '../screens/game_screens/memory_game.dart';
 import '../screens/game_screens/number_puzzle.dart';
 import '../screens/game_screens/rock_paper_scissors.dart';
-import '../screens/game_screens/hangman_game.dart';
-import '../screens/game_screens/quiz_game.dart';
 import '../screens/game_screens/reaction_test.dart';
-import '../screens/game_screens/color_match.dart';
-import '../screens/game_screens/word_search.dart';
 
 /// 기본 게임들을 레지스트리에 등록
 class GameInitializer {
@@ -82,32 +78,6 @@ class GameInitializer {
       ),
     );
 
-    // 행맨
-    registry.registerBuiltInGame(
-      BaseGameWrapper(
-        id: 'hangman',
-        name: '행맨',
-        description: '단어 맞추기 게임',
-        icon: Icons.text_fields,
-        color: Colors.teal,
-        categories: ['단어', '추측'],
-        gameBuilder: () => const HangmanGame(),
-      ),
-    );
-
-    // 퀴즈
-    registry.registerBuiltInGame(
-      BaseGameWrapper(
-        id: 'quiz',
-        name: '퀴즈',
-        description: '퀴즈 게임',
-        icon: Icons.quiz,
-        color: Colors.indigo,
-        categories: ['지식', '교육'],
-        gameBuilder: () => const QuizGame(),
-      ),
-    );
-
     // 반응속도
     registry.registerBuiltInGame(
       BaseGameWrapper(
@@ -121,31 +91,6 @@ class GameInitializer {
       ),
     );
 
-    // 색깔 맞추기
-    registry.registerBuiltInGame(
-      BaseGameWrapper(
-        id: 'color_match',
-        name: '색깔 맞추기',
-        description: '색상과 이름 매칭 게임',
-        icon: Icons.palette,
-        color: Colors.pink,
-        categories: ['색상', '인지'],
-        gameBuilder: () => const ColorMatch(),
-      ),
-    );
-
-    // 단어 찾기
-    registry.registerBuiltInGame(
-      BaseGameWrapper(
-        id: 'word_search',
-        name: '단어 찾기',
-        description: '단어 찾기 퍼즐',
-        icon: Icons.search,
-        color: Colors.cyan,
-        categories: ['단어', '퍼즐'],
-        gameBuilder: () => const WordSearch(),
-      ),
-    );
   }
 }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:share_lib/share_lib.dart' as share_lib;
 import '../models/game_metadata.dart';
 import '../services/game_downloader.dart';
@@ -69,23 +70,42 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
   }
 
   Future<void> _downloadGame(GameMetadata game) async {
-    // 광고 표시 (보상형 광고)
+    // 광고 타입에 따라 자동으로 적절한 광고 표시
     // 광고가 로드되지 않았거나 실패하면 바로 다운로드 진행
+
+    // 로딩 다이얼로그 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
     try {
-      await share_lib.AdService.shared.showInterstitialAd(
+      await share_lib.AdService.shared.showAd(
         onAdDismissed: () {
           // 광고 시청 완료 후 다운로드 진행
-          _performDownload(game);
+          if (mounted) {
+            Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+            _performDownload(game);
+          }
         },
         onAdFailedToShow: () {
           // 광고 표시 실패 시에도 다운로드 진행
-          _performDownload(game);
+          if (mounted) {
+            Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+            _performDownload(game);
+          }
         },
       );
     } catch (e) {
       // 광고 표시 중 에러 발생 시 바로 다운로드 진행
       debugPrint('Ad show error: $e');
-      _performDownload(game);
+      if (mounted) {
+        Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+        _performDownload(game);
+      }
     }
   }
 
@@ -118,12 +138,7 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
         // 게임 로드
         await _downloader.loadDownloadedGame(game.id);
         await _loadGames();
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-              content: Text(_localization.translateWithParams(
-                  'download_complete', {'name': game.name}))),
-        );
+        // 다운로드 완료는 조용히 처리 (스낵바 표시 안 함)
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -131,6 +146,84 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
                   'download_failed', {'name': game.name}))),
         );
       }
+    }
+  }
+
+  Future<void> _downloadAllGames() async {
+    if (!mounted) return;
+
+    // 디버그 모드에서는 이미 다운로드된 게임도 포함하여 모두 다운로드
+    final gamesToDownload = _availableGames.toList();
+
+    if (gamesToDownload.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('다운로드할 게임이 없습니다.')),
+      );
+      return;
+    }
+
+    // 확인 다이얼로그
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('모든 게임 다운로드'),
+        content: Text(
+            '${gamesToDownload.length}개의 게임을 다운로드하시겠습니까?\n(이미 다운로드된 게임도 다시 다운로드됩니다)'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('취소'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('다운로드'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    // 로딩 다이얼로그 표시
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(),
+      ),
+    );
+
+    int successCount = 0;
+    int failCount = 0;
+
+    for (var game in gamesToDownload) {
+      if (!mounted) break;
+
+      final success = await _downloader.downloadGame(
+        game,
+        (downloaded, total) {
+          // 진행률은 표시하지 않음 (여러 게임 동시 다운로드)
+        },
+      );
+
+      if (success) {
+        await _downloader.loadDownloadedGame(game.id);
+        successCount++;
+      } else {
+        failCount++;
+      }
+    }
+
+    if (mounted) {
+      Navigator.of(context).pop(); // 로딩 다이얼로그 닫기
+      await _loadGames();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('다운로드 완료: $successCount개 성공, $failCount개 실패'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
     }
   }
 
@@ -184,6 +277,12 @@ class _GameStoreScreenState extends State<GameStoreScreen> {
       appBar: AppBar(
         title: Text(_localization.translate('game_store')),
         actions: [
+          if (kDebugMode)
+            IconButton(
+              icon: const Icon(Icons.download_for_offline),
+              tooltip: '모든 게임 다운로드 (디버그)',
+              onPressed: _downloadAllGames,
+            ),
           IconButton(
             icon: const Icon(Icons.refresh),
             onPressed: _loadGames,

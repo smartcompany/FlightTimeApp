@@ -25,7 +25,8 @@ class _MemoryGameState extends State<MemoryGame> {
   }
 
   void initializeGame() {
-    List<int> cardValues = List.generate(8, (index) => index ~/ 2);
+    // 8쌍의 카드를 만들기 위해 각 숫자를 2번씩 생성
+    List<int> cardValues = List.generate(16, (index) => index ~/ 2);
     cardValues.shuffle(Random());
     setState(() {
       cards = cardValues;
@@ -118,7 +119,8 @@ class _MemoryGameState extends State<MemoryGame> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 Text('시도: $moves', style: const TextStyle(fontSize: 18)),
-                Text('찾은 쌍: $pairsFound/8', style: const TextStyle(fontSize: 18)),
+                Text('찾은 쌍: $pairsFound/8',
+                    style: const TextStyle(fontSize: 18)),
               ],
             ),
           ),
@@ -172,4 +174,3 @@ class _MemoryGameState extends State<MemoryGame> {
     );
   }
 }
-

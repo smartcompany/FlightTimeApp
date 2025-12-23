@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'dart:ui';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'screens/home_screen_v2.dart';
@@ -62,6 +63,11 @@ class _FlightTimeGamesAppState extends State<FlightTimeGamesApp> {
         Locale('ko', 'KR'),
         Locale('ja', 'JP'),
         Locale('zh', 'CN'),
+      ],
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
       ],
       home: const HomeScreenV2(),
       debugShowCheckedModeBanner: false,
